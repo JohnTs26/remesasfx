@@ -573,13 +573,15 @@
 //  CONFIG
 // ═══════════════════════════════════════════════
 const CONFIG = {
-  BINANCE_URL: 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
-  BCB_URL: 'https://apibcb.cucu.bo/api/v1/tc/oficial',
+  PROXY_URL: 'https://remesasfx-proxy.glafelgestionbo.workers.dev',
+  get BINANCE_URL() { return this.PROXY_URL + '?target=binance'; },
+  get BCB_URL()     { return this.PROXY_URL + '?target=bcb'; },
   ROWS: 10,           // número de anuncios a consultar
   OUTLIER_PCT: 0.05,  // descartar precios ±5% del mediano
   AUTO_REFRESH_SEC: 60,
   HISTORY_KEY: 'remesas_history',
 };
+
 
 // ═══════════════════════════════════════════════
 //  STATE
