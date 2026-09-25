@@ -8,6 +8,99 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RemesasFX" />
   <title>RemesasFX — CLP ↔ BOB</title>
+  <script>
+    // ── Protección por contraseña ──
+    const PASS_HASH = "dce7c0b3a0e5e2a7f1e4c9b2d6f8a3e5c1d0b7a9f2e6c4d8b1a5e9f3c7d2b0a6"; // hash referencia
+    const SESSION_KEY = "rfx_auth";
+    const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 horas
+
+    async function hashStr(s) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+    }
+
+    async function checkSession() {
+      try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const { ts } = JSON.parse(raw);
+          if (Date.now() - ts < SESSION_TTL) return true;
+        }
+      } catch {}
+      return false;
+    }
+
+    async function tryUnlock(pw) {
+      const h = await hashStr(pw);
+      // Comparar con hash de "California2026?"
+      const target = await hashStr("California2026?");
+      if (h === target) {
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ts: Date.now() }));
+        return true;
+      }
+      return false;
+    }
+
+    // Bloquear el DOM hasta autenticar
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (await checkSession()) return; // ya autenticado
+
+      // Ocultar app
+      document.body.style.display = "none";
+
+      // Crear overlay
+      const overlay = document.createElement("div");
+      overlay.id = "lockOverlay";
+      overlay.style.cssText = `
+        position:fixed;inset:0;background:#0f172a;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;z-index:9999;padding:2rem;
+      `;
+      overlay.innerHTML = `
+        <div style="text-align:center;max-width:320px;width:100%;">
+          <div style="font-size:3rem;margin-bottom:1rem;">🔒</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#f59e0b;margin-bottom:0.3rem;">RemesasFX</div>
+          <div style="font-size:0.8rem;color:#64748b;margin-bottom:2rem;">Cotizador CLP ↔ BOB · Acceso privado</div>
+          <input id="lockInput" type="password" placeholder="Contraseña" autocomplete="current-password"
+            style="width:100%;background:#1e293b;border:1px solid #475569;border-radius:10px;
+            color:#f1f5f9;font-size:1rem;padding:0.75rem 1rem;margin-bottom:0.75rem;outline:none;
+            text-align:center;letter-spacing:0.1em;" />
+          <button id="lockBtn" style="width:100%;background:#f59e0b;color:#000;border:none;
+            border-radius:10px;font-size:1rem;font-weight:700;padding:0.75rem;cursor:pointer;">
+            Entrar
+          </button>
+          <div id="lockErr" style="color:#ef4444;font-size:0.8rem;margin-top:0.75rem;min-height:1.2em;"></div>
+        </div>
+      `;
+      document.body.parentNode.insertBefore(overlay, document.body);
+
+      const input = overlay.querySelector("#lockInput");
+      const btn   = overlay.querySelector("#lockBtn");
+      const err   = overlay.querySelector("#lockErr");
+
+      async function attempt() {
+        const pw = input.value;
+        if (!pw) { err.textContent = "Ingresa la contraseña."; return; }
+        btn.textContent = "Verificando...";
+        btn.disabled = true;
+        const ok = await tryUnlock(pw);
+        if (ok) {
+          overlay.style.opacity = "0";
+          overlay.style.transition = "opacity 0.4s";
+          setTimeout(() => { overlay.remove(); document.body.style.display = ""; }, 400);
+        } else {
+          err.textContent = "Contraseña incorrecta. Inténtalo de nuevo.";
+          input.value = "";
+          input.focus();
+          btn.textContent = "Entrar";
+          btn.disabled = false;
+        }
+      }
+
+      btn.addEventListener("click", attempt);
+      input.addEventListener("keydown", e => { if (e.key === "Enter") attempt(); });
+      input.focus();
+    });
+  </script>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
