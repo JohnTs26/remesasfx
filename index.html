@@ -505,16 +505,33 @@
 
   </div>
 
+  <!-- USDT reference prices -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+    <div class="rate-card" style="border-color:#6366f1;">
+      <div style="height:3px;background:linear-gradient(90deg,#6366f1,#8b5cf6);position:absolute;top:0;left:0;right:0;border-radius:14px 14px 0 0;"></div>
+      <div class="rate-direction" style="color:#8b5cf6;">💱 USDT / BOB</div>
+      <div style="font-size:1.4rem;font-weight:800;margin:0.3rem 0;" id="usdt-bob-val"><div class="skeleton" style="height:1.4rem;width:70%;"></div></div>
+      <div style="font-size:0.65rem;color:var(--muted);">Promedio Binance P2P</div>
+    </div>
+    <div class="rate-card" style="border-color:#06b6d4;">
+      <div style="height:3px;background:linear-gradient(90deg,#06b6d4,#3b82f6);position:absolute;top:0;left:0;right:0;border-radius:14px 14px 0 0;"></div>
+      <div class="rate-direction" style="color:#06b6d4;">💱 USDT / CLP</div>
+      <div style="font-size:1.4rem;font-weight:800;margin:0.3rem 0;" id="usdt-clp-val"><div class="skeleton" style="height:1.4rem;width:70%;"></div></div>
+      <div style="font-size:0.65rem;color:var(--muted);">Promedio Binance P2P</div>
+    </div>
+  </div>
+
   <!-- Calculator -->
   <div class="calc-card">
     <div class="calc-title">🧮 Calculadora rápida</div>
-    <div style="display:flex; gap:0.5rem; margin-bottom:0.6rem; flex-wrap:wrap;">
-      <button class="calc-dir-btn active" id="btn-clp-bob" onclick="setCalcDir('clp-bob')">🇨🇱 CLP → 🇧🇴 BOB</button>
-      <button class="calc-dir-btn" id="btn-bob-clp" onclick="setCalcDir('bob-clp')">🇧🇴 BOB → 🇨🇱 CLP</button>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.85rem;">
+      <button class="calc-dir-btn active" id="btn-clp-bob" onclick="setCalcDir('clp-bob')">🇨🇱 Ingreso CLP<br><span style="font-size:0.65rem;opacity:0.8;">→ recibo BOB</span></button>
+      <button class="calc-dir-btn" id="btn-bob-clp" onclick="setCalcDir('bob-clp')">🇧🇴 Ingreso BOB<br><span style="font-size:0.65rem;opacity:0.8;">→ recibo CLP</span></button>
     </div>
     <div class="calc-row">
       <div class="calc-input-wrap">
-        <input type="number" class="calc-input" id="calcInput" placeholder="100,000" oninput="calcUpdate()" />
+        <input type="text" inputmode="numeric" class="calc-input" id="calcInput"
+          placeholder="100.000" oninput="onCalcInput(this)" />
         <div class="calc-label" id="calcInputLabel">Pesos Chilenos (CLP)</div>
       </div>
       <div class="calc-arrow">→</div>
@@ -729,8 +746,15 @@ function renderRates() {
   if (!rates) return;
 
   const { clpPer1000bob, bobPer100kClp } = rates;
+  const { clpBuy, clpSell, bobBuy, bobSell } = state;
 
-  // CLP → BOB card (for 1000 BOB, you need X CLP / for 100k CLP you get Y BOB)
+  // USDT reference prices (promedio entre buy y sell)
+  const usdtBob = (bobBuy && bobSell) ? ((bobBuy + bobSell) / 2) : null;
+  const usdtClp = (clpBuy && clpSell) ? ((clpBuy + clpSell) / 2) : null;
+  document.getElementById('usdt-bob-val').textContent = usdtBob ? fmt(usdtBob, 2) + ' BOB' : '—';
+  document.getElementById('usdt-clp-val').textContent = usdtClp ? fmt(usdtClp, 0) + ' CLP' : '—';
+
+  // CLP → BOB card
   document.getElementById('clpbob-main').innerHTML =
     `<span>${fmt(clpPer1000bob)}</span><span class="rate-unit">CLP por 1.000 BOB</span>`;
   document.getElementById('clpbob-sub').innerHTML =
@@ -757,37 +781,53 @@ function renderRates() {
 //  CALCULATOR
 // ═══════════════════════════════════════════════
 let calcDir = 'clp-bob';
+
+// Formatea el input con separadores de miles mientras el usuario escribe
+function onCalcInput(el) {
+  const raw = el.value.replace(/\./g, '').replace(/[^0-9]/g, '');
+  const num = parseInt(raw, 10);
+  if (!raw) { el.value = ''; calcUpdate(); return; }
+  // Formatear con puntos como separador de miles (estilo Chile/Bolivia)
+  el.value = num.toLocaleString('es-CL');
+  calcUpdate();
+}
+
+function getCalcRawValue() {
+  const raw = document.getElementById('calcInput').value.replace(/\./g, '').replace(/[^0-9]/g, '');
+  return parseFloat(raw) || 0;
+}
+
 function setCalcDir(dir) {
   calcDir = dir;
   document.getElementById('btn-clp-bob').classList.toggle('active', dir === 'clp-bob');
   document.getElementById('btn-bob-clp').classList.toggle('active', dir === 'bob-clp');
-  document.getElementById('calcInputLabel').textContent = dir === 'clp-bob' ? 'Pesos Chilenos (CLP)' : 'Bolivianos (BOB)';
+  document.getElementById('calcInputLabel').textContent  = dir === 'clp-bob' ? 'Pesos Chilenos (CLP)' : 'Bolivianos (BOB)';
   document.getElementById('calcResultLabel').textContent = dir === 'clp-bob' ? 'Bolivianos (BOB)' : 'Pesos Chilenos (CLP)';
-  document.getElementById('calcInput').placeholder = dir === 'clp-bob' ? '100000' : '1000';
-  calcUpdate();
+  document.getElementById('calcInput').placeholder = dir === 'clp-bob' ? '100.000' : '1.000';
+  document.getElementById('calcInput').value = '';
+  document.getElementById('calcResult').textContent = '—';
+  document.getElementById('calcNote').textContent = 'Ingresa un monto para calcular con tu margen aplicado.';
 }
 
 function calcUpdate() {
   const rates = computeRates();
   if (!rates) return;
   const margin = parseFloat(document.getElementById('marginInput').value) || 0;
-  const val = parseFloat(document.getElementById('calcInput').value);
-  if (!val || isNaN(val)) { document.getElementById('calcResult').textContent = '—'; return; }
+  const val = getCalcRawValue();
+  if (!val) { document.getElementById('calcResult').textContent = '—'; return; }
 
   let result;
   let note = '';
   if (calcDir === 'clp-bob') {
-    // how many BOB for `val` CLP
     const bobPer1clp = rates.bobPer100kClp / 100000;
     result = val * bobPer1clp;
     result = applyMargin(result, margin, 'bobclp');
-    note = margin > 0 ? `Incluye ${margin}% de margen` : 'Sin margen aplicado';
+    note = margin > 0 ? `Con ${margin}% de margen — precio Binance P2P` : 'Sin margen — precio Binance P2P';
   } else {
-    // how many CLP for `val` BOB
     const clpPer1bob = rates.clpPer1000bob / 1000;
     result = val * clpPer1bob;
     result = applyMargin(result, margin, 'clpbob');
-    note = margin > 0 ? `Incluye ${margin}% de margen` : 'Sin margen aplicado';
+    note = margin > 0 ? `Con ${margin}% de margen — precio Binance P2P` : 'Sin margen — precio Binance P2P';
   }
   document.getElementById('calcResult').textContent = fmt(result, calcDir === 'clp-bob' ? 2 : 0);
   document.getElementById('calcNote').textContent = note;
