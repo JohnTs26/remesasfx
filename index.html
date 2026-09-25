@@ -663,13 +663,14 @@ async function fetchBCB() {
     const res = await fetch(CONFIG.BCB_URL);
     if (!res.ok) return;
     const json = await res.json();
-    // Expected shape: { compra: "6.96", venta: "6.96", fecha: "..." } or similar
-    const d = json.data ?? json;
-    state.bcbBuy  = parseFloat(d.compra ?? d.buy ?? d.tasaCompra ?? d.value ?? 0);
-    state.bcbSell = parseFloat(d.venta ?? d.sell ?? d.tasaVenta ?? d.value ?? 0);
-    state.bcbDate = d.fecha ?? d.date ?? d.updatedAt ?? null;
-  } catch { /* BCB optional */ }
+    // La API devuelve { tc_oficial: { compra, venta, fecha, ... } }
+    const d = json.tc_oficial ?? json.data ?? json;
+    state.bcbBuy  = parseFloat(d.compra ?? d.buy ?? d.valor ?? 0);
+    state.bcbSell = parseFloat(d.venta ?? d.sell ?? d.valor ?? 0);
+    state.bcbDate = d.fecha ?? d.date ?? d.vigencia_desde ?? null;
+  } catch { /* BCB opcional */ }
 }
+
 
 // ═══════════════════════════════════════════════
 //  CALCULATIONS
