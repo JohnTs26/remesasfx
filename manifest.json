@@ -1,0 +1,25 @@
+{
+  "name": "RemesasFX — CLP ↔ BOB",
+  "short_name": "RemesasFX",
+  "description": "Cotizador de remesas en tiempo real: Pesos Chilenos ↔ Bolivianos vía Binance P2P",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "es",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

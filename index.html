@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RemesasFX" />
+  <title>RemesasFX — CLP ↔ BOB</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --surface2: #334155;
+      --border:   #475569;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --accent:   #f59e0b;
+      --green:    #22c55e;
+      --red:      #ef4444;
+      --blue:     #3b82f6;
+      --radius:   14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-bottom: 2rem;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-title { font-size: 1.2rem; font-weight: 700; color: var(--accent); }
+    .header-title span { color: var(--muted); font-size: 0.75rem; font-weight: 400; display: block; }
+    .refresh-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: opacity 0.2s;
+    }
+    .refresh-btn:active { opacity: 0.75; }
+    .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .dot.offline { background: var(--red); animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Container ── */
+    .container { padding: 0.75rem 1rem; max-width: 480px; margin: 0 auto; }
+
+    /* ── Margin control ── */
+    .margin-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 0.9rem 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .margin-label { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+    .margin-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex: 1;
+    }
+    .margin-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: center;
+      width: 70px;
+      padding: 0.35rem;
+    }
+    .margin-badge {
+      background: var(--accent);
+      color: #000;
+      font-size: 0.7rem;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+
+    /* ── Rate cards ── */
+    .rate-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+
+    .rate-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1rem 1.1rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .rate-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .card-clpbob::before { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .card-bobclp::before { background: linear-gradient(90deg, #22c55e, #3b82f6); }
+
+    .rate-direction {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .flag { font-size: 1.1rem; }
+
+    .rate-main {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.2rem;
+      color: var(--text);
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+    }
+    .rate-unit { font-size: 0.85rem; font-weight: 400; color: var(--muted); }
+
+    .rate-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.1rem;
+    }
+    .rate-sub strong { color: var(--text); }
+
+    .rate-with-margin {
+      margin-top: 0.6rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .margin-price-label { font-size: 0.7rem; color: var(--muted); }
+    .margin-price-val {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+      height: 2rem;
+      width: 60%;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── Calculator ── */
+    .calc-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1rem 1.1rem;
+      margin-bottom: 1rem;
+    }
+    .calc-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+    }
+    .calc-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .calc-input-wrap { flex: 1; min-width: 110px; }
+    .calc-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1.05rem;
+      font-weight: 600;
+      padding: 0.6rem 0.75rem;
+    }
+    .calc-label { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+    .calc-arrow { font-size: 1.3rem; color: var(--muted); align-self: center; }
+    .calc-result-wrap { flex: 1; min-width: 110px; }
+    .calc-result {
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent);
+      min-height: 2.3rem;
+    }
+    .calc-dir-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.75rem;
+      padding: 0.4rem 0.65rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .calc-dir-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* ── BCB card ── */
+    .bcb-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 0.9rem 1.1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .bcb-label { font-size: 0.75rem; color: var(--muted); }
+    .bcb-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue);
+    }
+    .bcb-updated { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+    /* ── Chart ── */
+    .chart-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 1rem 1.1rem;
+      margin-bottom: 1rem;
+    }
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .chart-title { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .chart-legend { display: flex; gap: 0.75rem; font-size: 0.68rem; color: var(--muted); }
+    .chart-legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .chart-wrap { position: relative; height: 180px; }
+
+    /* ── Error toast ── */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--red);
+      color: #fff;
+      border-radius: 10px;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ── Source info ── */
+    .source-note {
+      font-size: 0.65rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 0.5rem;
+      line-height: 1.5;
+    }
+    .source-note a { color: var(--blue); text-decoration: none; }
+
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-title">
+    RemesasFX 🇨🇱🇧🇴
+    <span id="lastUpdate">Actualizando...</span>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="fetchAll()">
+    <svg id="refreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+    Actualizar
+  </button>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <div class="dot" id="statusDot"></div>
+  <span id="statusText">Conectando a Binance P2P...</span>
+  <span style="margin-left:auto" id="autoTimer"></span>
+</div>
+
+<div class="container">
+
+  <!-- Margin control -->
+  <div class="margin-card">
+    <span class="margin-label">Margen de ganancia</span>
+    <div class="margin-input-wrap">
+      <input type="number" class="margin-input" id="marginInput" value="0" min="0" max="20" step="0.5" />
+      <span class="margin-badge">%</span>
+    </div>
+    <span style="font-size:0.7rem; color:var(--muted)">sobre precio Binance</span>
+  </div>
+
+  <!-- Rate cards -->
+  <div class="rate-grid">
+
+    <!-- CLP → BOB -->
+    <div class="rate-card card-clpbob">
+      <div class="rate-direction">
+        <span class="flag">🇨🇱</span> Pesos chilenos → <span class="flag">🇧🇴</span> Bolivianos
+      </div>
+      <div class="rate-main" id="clpbob-main">
+        <div class="skeleton"></div>
+      </div>
+      <div class="rate-sub" id="clpbob-sub">...</div>
+      <div class="rate-with-margin" id="clpbob-margin-row">
+        <span class="margin-price-label">Tu precio (con margen)</span>
+        <span class="margin-price-val" id="clpbob-margin-val">—</span>
+      </div>
+    </div>
+
+    <!-- BOB → CLP -->
+    <div class="rate-card card-bobclp">
+      <div class="rate-direction">
+        <span class="flag">🇧🇴</span> Bolivianos → <span class="flag">🇨🇱</span> Pesos chilenos
+      </div>
+      <div class="rate-main" id="bobclp-main">
+        <div class="skeleton"></div>
+      </div>
+      <div class="rate-sub" id="bobclp-sub">...</div>
+      <div class="rate-with-margin" id="bobclp-margin-row">
+        <span class="margin-price-label">Tu precio (con margen)</span>
+        <span class="margin-price-val" id="bobclp-margin-val">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Calculator -->
+  <div class="calc-card">
+    <div class="calc-title">🧮 Calculadora rápida</div>
+    <div style="display:flex; gap:0.5rem; margin-bottom:0.6rem; flex-wrap:wrap;">
+      <button class="calc-dir-btn active" id="btn-clp-bob" onclick="setCalcDir('clp-bob')">🇨🇱 CLP → 🇧🇴 BOB</button>
+      <button class="calc-dir-btn" id="btn-bob-clp" onclick="setCalcDir('bob-clp')">🇧🇴 BOB → 🇨🇱 CLP</button>
+    </div>
+    <div class="calc-row">
+      <div class="calc-input-wrap">
+        <input type="number" class="calc-input" id="calcInput" placeholder="100,000" oninput="calcUpdate()" />
+        <div class="calc-label" id="calcInputLabel">Pesos Chilenos (CLP)</div>
+      </div>
+      <div class="calc-arrow">→</div>
+      <div class="calc-result-wrap">
+        <div class="calc-result" id="calcResult">—</div>
+        <div class="calc-label" id="calcResultLabel">Bolivianos (BOB)</div>
+      </div>
+    </div>
+    <div style="font-size:0.7rem; color:var(--muted); margin-top:0.6rem;" id="calcNote">
+      Ingresa un monto para calcular con tu margen aplicado.
+    </div>
+  </div>
+
+  <!-- BCB -->
+  <div class="bcb-card">
+    <div>
+      <div class="bcb-label">🏦 Banco Central de Bolivia (BCB)</div>
+      <div class="bcb-val" id="bcb-val">Cargando...</div>
+      <div class="bcb-updated" id="bcb-updated"></div>
+    </div>
+    <div style="text-align:right;">
+      <div class="bcb-label">USD/BOB oficial</div>
+      <div class="bcb-val" id="bcb-usdbob">—</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">📈 Historial hoy</span>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:#f59e0b"></span>CLP/BOB</span>
+        <span><span class="legend-dot" style="background:#22c55e"></span>BOB/CLP (×1000)</span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="historyChart"></canvas>
+    </div>
+    <div style="font-size:0.65rem; color:var(--muted); margin-top:0.4rem; text-align:center;">
+      Se registra automáticamente cada actualización. Datos de hoy.
+    </div>
+  </div>
+
+  <div class="source-note">
+    Datos: <a href="https://p2p.binance.com" target="_blank">Binance P2P</a> (promedio filtrado, top 10 anuncios) ·
+    <a href="https://apibcb.cucu.bo" target="_blank">API BCB</a><br>
+    Esta app es de uso interno. No constituye asesoramiento financiero.
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════════
+const CONFIG = {
+  BINANCE_URL: 'https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search',
+  BCB_URL: 'https://apibcb.cucu.bo/api/v1/tc/oficial',
+  ROWS: 10,           // número de anuncios a consultar
+  OUTLIER_PCT: 0.05,  // descartar precios ±5% del mediano
+  AUTO_REFRESH_SEC: 60,
+  HISTORY_KEY: 'remesas_history',
+};
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let state = {
+  clpBuy: null,   // precio CLP/USDT para comprar USDT con CLP
+  clpSell: null,  // precio CLP/USDT para vender USDT por CLP
+  bobBuy: null,
+  bobSell: null,
+  bcbBuy: null,
+  bcbSell: null,
+  bcbDate: null,
+  loading: false,
+  margin: 0,
+  calcDir: 'clp-bob',
+  history: [],
+};
+
+// ═══════════════════════════════════════════════
+//  HISTORY (localStorage)
+// ═══════════════════════════════════════════════
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(CONFIG.HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    const today = new Date().toDateString();
+    return arr.filter(h => new Date(h.ts).toDateString() === today);
+  } catch { return []; }
+}
+
+function saveHistory(entry) {
+  try {
+    const arr = loadHistory();
+    arr.push(entry);
+    // Keep max 48 points
+    if (arr.length > 48) arr.splice(0, arr.length - 48);
+    localStorage.setItem(CONFIG.HISTORY_KEY, JSON.stringify(arr));
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════
+//  BINANCE P2P
+// ═══════════════════════════════════════════════
+async function fetchP2P(fiat, tradeType) {
+  const body = {
+    fiat, page: 1, rows: CONFIG.ROWS,
+    tradeType, asset: 'USDT',
+    countries: [], proMerchantAds: false, shieldMerchantAds: false,
+    filterType: 'all', periods: [], additionalKycVerifyFilter: 0,
+    publisherType: null, payTypes: [],
+    classifies: ['mass', 'profession'],
+  };
+  const res = await fetch(CONFIG.BINANCE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const prices = (json.data || []).map(d => parseFloat(d.adv.price)).filter(p => p > 0);
+  return filterOutliers(prices);
+}
+
+function filterOutliers(prices) {
+  if (!prices.length) return null;
+  const sorted = [...prices].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const filtered = sorted.filter(p => Math.abs(p - median) / median <= CONFIG.OUTLIER_PCT);
+  if (!filtered.length) return median;
+  return filtered.reduce((a, b) => a + b, 0) / filtered.length;
+}
+
+// ═══════════════════════════════════════════════
+//  BCB
+// ═══════════════════════════════════════════════
+async function fetchBCB() {
+  try {
+    const res = await fetch(CONFIG.BCB_URL);
+    if (!res.ok) return;
+    const json = await res.json();
+    // Expected shape: { compra: "6.96", venta: "6.96", fecha: "..." } or similar
+    const d = json.data ?? json;
+    state.bcbBuy  = parseFloat(d.compra ?? d.buy ?? d.tasaCompra ?? d.value ?? 0);
+    state.bcbSell = parseFloat(d.venta ?? d.sell ?? d.tasaVenta ?? d.value ?? 0);
+    state.bcbDate = d.fecha ?? d.date ?? d.updatedAt ?? null;
+  } catch { /* BCB optional */ }
+}
+
+// ═══════════════════════════════════════════════
+//  CALCULATIONS
+//  Para enviar CLP → BOB vía Binance:
+//    Yo VENDO USDT por CLP  → precio SELL CLP (anuncio SELL = me da CLP)
+//    Yo COMPRO BOB con USDT → precio BUY BOB (anuncio BUY = da BOB)
+//
+//  Conversión: 1 BOB = (1/bobBuy) USDT = (1/bobBuy) * clpSell CLP
+//  Por 1000 BOB: 1000 * clpSell / bobBuy CLP
+//
+//  Para BOB → CLP:
+//    Yo VENDO BOB por USDT → precio SELL BOB (anuncio SELL)
+//    Yo COMPRO CLP con USDT → precio BUY CLP
+//
+//  Por 100000 CLP: 100000 / clpBuy * bobSell BOB
+// ═══════════════════════════════════════════════
+function computeRates() {
+  const { clpBuy, clpSell, bobBuy, bobSell } = state;
+  if (!clpBuy || !clpSell || !bobBuy || !bobSell) return null;
+  // Rate: how much CLP for 1000 BOB (you give BOB, receive CLP)
+  // You sell BOB (SELL side), buy CLP (BUY side)
+  const clpPer1000bob = 1000 * clpBuy / bobSell;
+
+  // Rate: how much BOB for 100000 CLP (you give CLP, receive BOB)
+  // You sell CLP (SELL side), buy BOB (BUY side)
+  const bobPer100kClp = 100000 / clpSell * bobBuy;
+
+  return { clpPer1000bob, bobPer100kClp };
+}
+
+function applyMargin(value, marginPct, direction) {
+  // For CLP → BOB: client gets fewer BOB (we keep some)
+  // For BOB → CLP: client gets fewer CLP (we keep some)
+  return value * (1 - marginPct / 100);
+}
+
+// ═══════════════════════════════════════════════
+//  FETCH ALL
+// ═══════════════════════════════════════════════
+async function fetchAll() {
+  if (state.loading) return;
+  state.loading = true;
+  setRefreshSpinner(true);
+  setStatus('connecting');
+
+  try {
+    const [clpBuyVal, clpSellVal, bobBuyVal, bobSellVal] = await Promise.all([
+      fetchP2P('CLP', 'BUY'),
+      fetchP2P('CLP', 'SELL'),
+      fetchP2P('BOB', 'BUY'),
+      fetchP2P('BOB', 'SELL'),
+    ]);
+
+    state.clpBuy  = clpBuyVal;
+    state.clpSell = clpSellVal;
+    state.bobBuy  = bobBuyVal;
+    state.bobSell = bobSellVal;
+
+    await fetchBCB();
+
+    const rates = computeRates();
+    if (rates) {
+      const ts = Date.now();
+      const entry = { ts, clpPer1000bob: rates.clpPer1000bob, bobPer100kClp: rates.bobPer100kClp };
+      saveHistory(entry);
+    }
+
+    state.history = loadHistory();
+    renderRates();
+    renderChart();
+    renderBCB();
+
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent =
+      `Actualizado: ${now.toLocaleTimeString('es-CL')}`;
+    setStatus('online');
+  } catch (err) {
+    setStatus('offline');
+    showToast('Error al conectar con Binance P2P');
+    console.error(err);
+  } finally {
+    state.loading = false;
+    setRefreshSpinner(false);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER RATES
+// ═══════════════════════════════════════════════
+function fmt(n, dec = 0) {
+  if (!n || isNaN(n)) return '—';
+  return n.toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+function renderRates() {
+  const rates = computeRates();
+  const margin = parseFloat(document.getElementById('marginInput').value) || 0;
+  state.margin = margin;
+
+  if (!rates) return;
+
+  const { clpPer1000bob, bobPer100kClp } = rates;
+
+  // CLP → BOB card (for 1000 BOB, you need X CLP / for 100k CLP you get Y BOB)
+  document.getElementById('clpbob-main').innerHTML =
+    `<span>${fmt(clpPer1000bob)}</span><span class="rate-unit">CLP por 1.000 BOB</span>`;
+  document.getElementById('clpbob-sub').innerHTML =
+    `Por 100.000 CLP → <strong>${fmt(bobPer100kClp, 2)} BOB</strong>`;
+
+  const clpPer1000bob_m = applyMargin(clpPer1000bob, margin, 'clpbob');
+  document.getElementById('clpbob-margin-val').textContent =
+    margin > 0 ? `${fmt(clpPer1000bob_m)} CLP / 1.000 BOB` : `(sin margen)`;
+
+  // BOB → CLP card
+  document.getElementById('bobclp-main').innerHTML =
+    `<span>${fmt(bobPer100kClp, 2)}</span><span class="rate-unit">BOB por 100.000 CLP</span>`;
+  document.getElementById('bobclp-sub').innerHTML =
+    `Por 1.000 BOB → <strong>${fmt(clpPer1000bob)} CLP</strong>`;
+
+  const bobPer100k_m = applyMargin(bobPer100kClp, margin, 'bobclp');
+  document.getElementById('bobclp-margin-val').textContent =
+    margin > 0 ? `${fmt(bobPer100k_m, 2)} BOB / 100.000 CLP` : `(sin margen)`;
+
+  calcUpdate();
+}
+
+// ═══════════════════════════════════════════════
+//  CALCULATOR
+// ═══════════════════════════════════════════════
+let calcDir = 'clp-bob';
+function setCalcDir(dir) {
+  calcDir = dir;
+  document.getElementById('btn-clp-bob').classList.toggle('active', dir === 'clp-bob');
+  document.getElementById('btn-bob-clp').classList.toggle('active', dir === 'bob-clp');
+  document.getElementById('calcInputLabel').textContent = dir === 'clp-bob' ? 'Pesos Chilenos (CLP)' : 'Bolivianos (BOB)';
+  document.getElementById('calcResultLabel').textContent = dir === 'clp-bob' ? 'Bolivianos (BOB)' : 'Pesos Chilenos (CLP)';
+  document.getElementById('calcInput').placeholder = dir === 'clp-bob' ? '100000' : '1000';
+  calcUpdate();
+}
+
+function calcUpdate() {
+  const rates = computeRates();
+  if (!rates) return;
+  const margin = parseFloat(document.getElementById('marginInput').value) || 0;
+  const val = parseFloat(document.getElementById('calcInput').value);
+  if (!val || isNaN(val)) { document.getElementById('calcResult').textContent = '—'; return; }
+
+  let result;
+  let note = '';
+  if (calcDir === 'clp-bob') {
+    // how many BOB for `val` CLP
+    const bobPer1clp = rates.bobPer100kClp / 100000;
+    result = val * bobPer1clp;
+    result = applyMargin(result, margin, 'bobclp');
+    note = margin > 0 ? `Incluye ${margin}% de margen` : 'Sin margen aplicado';
+  } else {
+    // how many CLP for `val` BOB
+    const clpPer1bob = rates.clpPer1000bob / 1000;
+    result = val * clpPer1bob;
+    result = applyMargin(result, margin, 'clpbob');
+    note = margin > 0 ? `Incluye ${margin}% de margen` : 'Sin margen aplicado';
+  }
+  document.getElementById('calcResult').textContent = fmt(result, calcDir === 'clp-bob' ? 2 : 0);
+  document.getElementById('calcNote').textContent = note;
+}
+
+// ═══════════════════════════════════════════════
+//  BCB RENDER
+// ═══════════════════════════════════════════════
+function renderBCB() {
+  const { bcbBuy, bcbSell, bcbDate } = state;
+  if (bcbBuy) {
+    document.getElementById('bcb-val').textContent =
+      `Compra: ${bcbBuy.toFixed(4)} BOB/USD | Venta: ${(bcbSell || bcbBuy).toFixed(4)}`;
+    document.getElementById('bcb-usdbob').textContent = bcbBuy.toFixed(4);
+    if (bcbDate) {
+      const d = new Date(bcbDate);
+      document.getElementById('bcb-updated').textContent = `Actualizado: ${isNaN(d) ? bcbDate : d.toLocaleDateString('es-CL')}`;
+    }
+  } else {
+    document.getElementById('bcb-val').textContent = 'No disponible';
+    document.getElementById('bcb-usdbob').textContent = '—';
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  CHART
+// ═══════════════════════════════════════════════
+let chart = null;
+function renderChart() {
+  const history = loadHistory();
+  if (!history.length) return;
+
+  const labels = history.map(h => {
+    const d = new Date(h.ts);
+    return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  });
+  const clpData = history.map(h => h.clpPer1000bob ? Math.round(h.clpPer1000bob) : null);
+  const bobData = history.map(h => h.bobPer100kClp ? Math.round(h.bobPer100kClp * 1000) / 1000 : null);
+
+  const ctx = document.getElementById('historyChart').getContext('2d');
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = clpData;
+    chart.data.datasets[1].data = bobData;
+    chart.update('active');
+    return;
+  }
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'CLP/1000BOB',
+          data: clpData,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.08)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#f59e0b',
+          yAxisID: 'yLeft',
+        },
+        {
+          label: 'BOB/100kCLP (×1)',
+          data: bobData,
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.08)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#22c55e',
+          yAxisID: 'yRight',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          borderColor: '#475569',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor: '#94a3b8',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (ctx.datasetIndex === 0) return ` CLP: ${v?.toLocaleString('es-CL') ?? '—'} / 1000 BOB`;
+              return ` BOB: ${v?.toFixed(2) ?? '—'} / 100k CLP`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#64748b', font: { size: 10 } },
+          grid: { color: 'rgba(71,85,105,0.3)' },
+        },
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          ticks: { color: '#f59e0b', font: { size: 9 }, callback: v => v?.toLocaleString('es-CL') },
+          grid: { color: 'rgba(71,85,105,0.2)' },
+        },
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          ticks: { color: '#22c55e', font: { size: 9 }, callback: v => v?.toFixed(2) },
+          grid: { display: false },
+        },
+      },
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  AUTO REFRESH
+// ═══════════════════════════════════════════════
+let countdown = CONFIG.AUTO_REFRESH_SEC;
+let timer;
+function startAutoRefresh() {
+  clearInterval(timer);
+  countdown = CONFIG.AUTO_REFRESH_SEC;
+  timer = setInterval(() => {
+    countdown--;
+    document.getElementById('autoTimer').textContent = `Auto: ${countdown}s`;
+    if (countdown <= 0) {
+      fetchAll();
+      countdown = CONFIG.AUTO_REFRESH_SEC;
+    }
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════════
+function setStatus(s) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (s === 'online') {
+    dot.className = 'dot';
+    txt.textContent = 'Conectado — Binance P2P en vivo';
+  } else if (s === 'offline') {
+    dot.className = 'dot offline';
+    txt.textContent = 'Sin conexión — usando último dato';
+  } else {
+    dot.className = 'dot';
+    dot.style.background = '#f59e0b';
+    txt.textContent = 'Conectando a Binance P2P...';
+  }
+}
+
+function setRefreshSpinner(on) {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.toggle('spinning', on);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════
+document.getElementById('marginInput').addEventListener('input', renderRates);
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+state.history = loadHistory();
+renderChart();
+fetchAll();
+startAutoRefresh();
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(err => console.warn('SW error:', err));
+  });
+}
+</script>
+</body>
+</html>
