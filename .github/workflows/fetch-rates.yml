@@ -1,0 +1,117 @@
+name: Actualizar precios Binance P2P
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # cada 5 minutos
+  workflow_dispatch:          # también permite ejecutar manualmente
+
+jobs:
+  fetch-rates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Obtener precios Binance P2P y BCB
+        run: |
+          fetch_p2p() {
+            local fiat=$1
+            local trade=$2
+            curl -s -X POST "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36" \
+              -H "Accept: */*" \
+              -H "Accept-Language: es-419,es;q=0.9" \
+              -H "Referer: https://p2p.binance.com/es-LA/trade/all-payments/USDT?fiat=${fiat}" \
+              -H "Origin: https://p2p.binance.com" \
+              -H "sec-fetch-dest: empty" \
+              -H "sec-fetch-mode: cors" \
+              -H "sec-fetch-site: same-origin" \
+              -d "{\"fiat\":\"${fiat}\",\"page\":1,\"rows\":10,\"tradeType\":\"${trade}\",\"asset\":\"USDT\",\"countries\":[],\"proMerchantAds\":false,\"shieldMerchantAds\":false,\"filterType\":\"all\",\"periods\":[],\"additionalKycVerifyFilter\":0,\"publisherType\":null,\"payTypes\":[],\"classifies\":[\"mass\",\"profession\"]}" \
+              --max-time 15
+          }
+
+          echo "Obteniendo precios..."
+          CLP_BUY=$(fetch_p2p CLP BUY)
+          CLP_SELL=$(fetch_p2p CLP SELL)
+          BOB_BUY=$(fetch_p2p BOB BUY)
+          BOB_SELL=$(fetch_p2p BOB SELL)
+          BCB=$(curl -s "https://apibcb.cucu.bo/api/v1/tc/oficial" --max-time 10 || echo '{}')
+
+          # Calcular promedios filtrando outliers con Python
+          python3 - <<'PYEOF'
+          import json, sys, statistics, os
+
+          def get_avg(raw):
+              try:
+                  data = json.loads(raw)
+                  prices = [float(d['adv']['price']) for d in (data.get('data') or []) if d.get('adv',{}).get('price')]
+                  if not prices: return None
+                  prices.sort()
+                  med = statistics.median(prices)
+                  filtered = [p for p in prices if abs(p - med) / med <= 0.05]
+                  return round(sum(filtered) / len(filtered), 4) if filtered else round(med, 4)
+              except Exception as e:
+                  print(f"Error: {e}", file=sys.stderr)
+                  return None
+
+          clp_buy  = get_avg(os.environ['CLP_BUY'])
+          clp_sell = get_avg(os.environ['CLP_SELL'])
+          bob_buy  = get_avg(os.environ['BOB_BUY'])
+          bob_sell = get_avg(os.environ['BOB_SELL'])
+
+          # BCB
+          bcb_buy = bcb_sell = bcb_date = None
+          try:
+              bcb_data = json.loads(os.environ['BCB'])
+              d = bcb_data.get('tc_oficial') or bcb_data
+              bcb_buy  = float(d.get('compra') or d.get('valor') or 0) or None
+              bcb_sell = float(d.get('venta')  or d.get('valor') or 0) or None
+              bcb_date = d.get('fecha') or d.get('vigencia_desde')
+          except: pass
+
+          # Tasas derivadas
+          clp_per_1000bob = round(1000 * clp_buy / bob_sell, 2) if clp_buy and bob_sell else None
+          bob_per_100kclp = round(100000 / clp_sell * bob_buy, 4) if clp_sell and bob_buy else None
+
+          result = {
+              "updatedAt": "",
+              "clpBuy": clp_buy,
+              "clpSell": clp_sell,
+              "bobBuy": bob_buy,
+              "bobSell": bob_sell,
+              "clpPer1000bob": clp_per_1000bob,
+              "bobPer100kClp": bob_per_100kclp,
+              "bcbBuy": bcb_buy,
+              "bcbSell": bcb_sell,
+              "bcbDate": bcb_date,
+              "ok": all([clp_buy, clp_sell, bob_buy, bob_sell])
+          }
+
+          from datetime import datetime, timezone
+          result["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+          with open('rates.json', 'w') as f:
+              json.dump(result, f, indent=2)
+
+          print(f"✅ CLP/BUY={clp_buy} | CLP/SELL={clp_sell} | BOB/BUY={bob_buy} | BOB/SELL={bob_sell}")
+          print(f"   → 1000 BOB = {clp_per_1000bob} CLP | 100k CLP = {bob_per_100kclp} BOB")
+          print(f"   BCB: compra={bcb_buy} venta={bcb_sell}")
+          PYEOF
+        env:
+          CLP_BUY: ${{ env.CLP_BUY }}
+          CLP_SELL: ${{ env.CLP_SELL }}
+          BOB_BUY: ${{ env.BOB_BUY }}
+          BOB_SELL: ${{ env.BOB_SELL }}
+          BCB: ${{ env.BCB }}
+
+      - name: Guardar rates.json en el repositorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add rates.json
+          git diff --staged --quiet || git commit -m "chore: actualizar precios $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
