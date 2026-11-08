@@ -1,13 +1,13 @@
 {
-  "updatedAt": "2026-11-08T02:45:24.221551+00:00",
-  "clpBuy": 983.582,
-  "clpSell": 980.928,
-  "bobBuy": 12.001,
-  "bobSell": 12.004,
-  "clpPer1000bob": 81937.85,
-  "bobPer100kClp": 1223.4333,
+  "updatedAt": "2026-11-08T09:35:05.547191+00:00",
+  "clpBuy": 987.091,
+  "clpSell": 981.224,
+  "bobBuy": 12.005,
+  "bobSell": 11.971,
+  "clpPer1000bob": 82456.85,
+  "bobPer100kClp": 1223.4719,
   "bcbBuy": 11.81,
   "bcbSell": 11.81,
-  "bcbDate": "2026-11-07",
+  "bcbDate": "2026-11-08",
   "ok": true
 }
